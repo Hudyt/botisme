@@ -1,0 +1,114 @@
+import discord
+from discord.ext import commands, tasks
+import random
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
+PREFIX = '!'
+
+# Initialize bot
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+# Feature: Trivia Game
+trivia_questions = {
+    "What is the capital of France?": "Paris",
+    "Who wrote 'To Kill a Mockingbird'?": "Harper Lee",
+    "What is 5 + 7?": "12",
+}
+
+@bot.command(name='trivia')
+async def trivia(ctx):
+    question, answer = random.choice(list(trivia_questions.items()))
+    await ctx.send(f"Trivia Time! {question}")
+
+    def check(m):
+        return m.author == ctx.author and m.channel == ctx.channel
+
+    try:
+        msg = await bot.wait_for('message', check=check, timeout=15.0)
+        if msg.content.lower() == answer.lower():
+            await ctx.send("Correct! 🎉")
+        else:
+            await ctx.send(f"Oops! The correct answer was {answer}.")
+    except asyncio.TimeoutError:
+        await ctx.send(f"Time's up! The correct answer was {answer}.")
+
+# Feature: Word Chain Game
+@bot.command(name='wordchain')
+async def wordchain(ctx):
+    await ctx.send("Let's play Word Chain! Start with any word.")
+
+    def check(m):
+        return m.channel == ctx.channel
+
+    last_word = None
+    while True:
+        try:
+            msg = await bot.wait_for('message', check=check, timeout=30.0)
+            word = msg.content.lower()
+
+            if last_word and not word.startswith(last_word[-1]):
+                await ctx.send(f"Game over! `{word}` doesn't start with `{last_word[-1]}`.")
+                break
+
+            last_word = word
+        except asyncio.TimeoutError:
+            await ctx.send("Time's up! Game over.")
+            break
+
+# Feature: Random Meme Generator
+@bot.command(name='meme')
+async def meme(ctx):
+    memes = [
+        "https://i.imgflip.com/1bij.jpg",  # Example meme URLs
+        "https://i.imgflip.com/26am.jpg",
+        "https://i.imgflip.com/3si4.jpg"
+    ]
+    await ctx.send(random.choice(memes))
+
+# Feature: Custom Poll
+@bot.command(name='poll')
+async def poll(ctx, *options):
+    if len(options) < 2:
+        await ctx.send("You need at least two options to create a poll!")
+        return
+
+    poll_embed = discord.Embed(title="Poll", description="Vote below!", color=discord.Color.blue())
+    emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣']
+    poll_message = ""
+
+    for i, option in enumerate(options[:5]):
+        poll_message += f"{emojis[i]} {option}\n"
+
+    poll_embed.add_field(name="Options", value=poll_message, inline=False)
+    message = await ctx.send(embed=poll_embed)
+
+    for i in range(len(options[:5])):
+        await message.add_reaction(emojis[i])
+
+# Feature: Karma System
+karma = {}
+
+@bot.command(name='karma')
+async def show_karma(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    karma_points = karma.get(member.id, 0)
+    await ctx.send(f"{member.display_name} has {karma_points} karma points.")
+
+@bot.command(name='givekarma')
+async def give_karma(ctx, member: discord.Member):
+    if member.id == ctx.author.id:
+        await ctx.send("You can't give karma to yourself!")
+        return
+
+    karma[member.id] = karma.get(member.id, 0) + 1
+    await ctx.send(f"Gave 1 karma point to {member.display_name}. They now have {karma[member.id]} points!")
+
+# Run the bot
+bot.run(TOKEN)
