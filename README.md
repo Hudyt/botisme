@@ -1,0 +1,2 @@
+# botisme
+Guffal Bot Discord
